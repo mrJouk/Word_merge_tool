@@ -47,6 +47,16 @@ When a source file is `.doc`, the Word backend first exports it through Microsof
 
 When both documents contain a table at the same table position, the app creates one merged table instead of two separate tables. Matching header cells are written as `Kyrgyz title / Russian title`.
 
+## Inspect Parsing
+
+Use this when you need to see exactly what Word exposes before merging:
+
+```powershell
+.\.venv\Scripts\python.exe inspect_parsing.py --pair legacy --output parsing_report.txt
+```
+
+The report shows headers, footers, body paragraphs, Word list labels such as `I)` or `1)`, and table cells for both documents. For `.doc` inputs it also creates a temporary `.docx` export and reports that parse too, so you can check whether `.doc -> .docx` conversion changes Roman numerals.
+
 ## Backends
 
 The default `--backend auto` tries Microsoft Word automation first, then falls back to a `.docx` XML backend.
