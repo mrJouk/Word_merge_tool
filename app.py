@@ -321,9 +321,10 @@ class WordAutomationMerger:
         """Append formatted source ranges in the standard Kyrgyz/Russian two-column table."""
         table = self._add_word_table_at_end(merged_doc, cfg.MERGED_TABLE_ROWS, cfg.MERGED_TABLE_COLUMNS)
         table.Borders.Enable = True
-        table.AllowAutoFit = True
+        self._fix_two_column_word_table_widths(merged_doc, table)
         self._copy_range_to_cell(kyrgyz_range, table.Cell(cfg.WORD_TABLE_ROW, cfg.WORD_KYRGYZ_COLUMN))
         self._copy_range_to_cell(russian_range, table.Cell(cfg.WORD_TABLE_ROW, cfg.WORD_RUSSIAN_COLUMN))
+        self._fix_two_column_word_table_widths(merged_doc, table)
         self._append_paragraph_after_word_table(merged_doc, table)
 
     def _copy_range_to_cell(self, source_range, cell) -> None:
@@ -361,6 +362,29 @@ class WordAutomationMerger:
         insert_at = max(doc.Content.End - 1, doc.Content.Start)
         target_range = doc.Range(insert_at, insert_at)
         return doc.Tables.Add(target_range, rows, columns)
+
+    def _fix_two_column_word_table_widths(self, doc, table) -> None:
+        """Force comparison tables to full width with equal Kyrgyz/Russian columns."""
+        try:
+            table.AllowAutoFit = False
+            table.AutoFitBehavior(cfg.WORD_AUTOFIT_FIXED)
+        except Exception as exc:
+            logging.debug("Could not disable Word table autofit: %s", exc)
+
+        try:
+            usable_width = doc.PageSetup.PageWidth - doc.PageSetup.LeftMargin - doc.PageSetup.RightMargin
+            column_width = usable_width * cfg.TWO_COLUMN_WIDTH_RATIO
+            table.PreferredWidthType = cfg.WORD_PREFERRED_WIDTH_POINTS
+            table.PreferredWidth = usable_width
+            table.Columns(cfg.WORD_KYRGYZ_COLUMN).Width = column_width
+            table.Columns(cfg.WORD_RUSSIAN_COLUMN).Width = column_width
+        except Exception as exc:
+            logging.debug("Could not set equal Word table column widths: %s", exc)
+
+        try:
+            table.Columns.DistributeWidth()
+        except Exception as exc:
+            logging.debug("Could not distribute Word table columns: %s", exc)
 
     def _append_paragraph_after_word_table(self, doc, table) -> None:
         """Create a real paragraph after a table so the next table is not nested."""
@@ -524,8 +548,21 @@ class DocxStructuralMerger:
         """Append unmatched text/table blocks in the standard Kyrgyz/Russian two-column layout."""
         table = merged_doc.add_table(rows=cfg.MERGED_TABLE_ROWS, cols=cfg.MERGED_TABLE_COLUMNS)
         table.style = cfg.TABLE_GRID_STYLE
+        self._fix_two_column_docx_table_widths(merged_doc, table)
         copy_nodes_to_cell(kyrgyz_nodes, kyrgyz_doc.part, merged_doc.part, table.cell(0, 0), self.qn, self.RT)
         copy_nodes_to_cell(russian_nodes, russian_doc.part, merged_doc.part, table.cell(0, 1), self.qn, self.RT)
+        self._fix_two_column_docx_table_widths(merged_doc, table)
+
+    def _fix_two_column_docx_table_widths(self, doc, table) -> None:
+        """Force fallback comparison tables to fixed equal columns."""
+        section = doc.sections[0]
+        column_width = int((section.page_width - section.left_margin - section.right_margin) * cfg.TWO_COLUMN_WIDTH_RATIO)
+        table.autofit = False
+        for column in table.columns:
+            column.width = column_width
+        for row in table.rows:
+            for cell in row.cells:
+                cell.width = column_width
 
     def _append_merged_table(self, kyrgyz_table, russian_table, merged_doc) -> None:
         """Create one table from matching source tables, combining cell text with '/'."""
