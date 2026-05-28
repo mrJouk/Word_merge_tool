@@ -4,7 +4,6 @@ import argparse
 import logging
 import re
 import sys
-import tempfile
 from copy import deepcopy
 from dataclasses import dataclass
 from io import BytesIO
@@ -164,61 +163,36 @@ class WordAutomationMerger:
 
         kyrgyz_doc = russian_doc = merged_doc = None
         try:
-            with tempfile.TemporaryDirectory(prefix=cfg.PREPARED_DOCX_TEMP_PREFIX) as temp_dir:
-                temp_root = Path(temp_dir)
-                kyrgyz_source = self._prepare_source(pair.kyrgyz, cfg.KYRGYZ_LANGUAGE_KEY, temp_root)
-                russian_source = self._prepare_source(pair.russian, cfg.RUSSIAN_LANGUAGE_KEY, temp_root)
-                kyrgyz_doc = self._open_source(kyrgyz_source)
-                russian_doc = self._open_source(russian_source)
-                merged_doc = self.word.Documents.Add()
+            kyrgyz_doc = self._open_source(pair.kyrgyz)
+            russian_doc = self._open_source(pair.russian)
+            merged_doc = self.word.Documents.Add()
 
-                self._set_headers_and_footers(
-                    merged_doc,
-                    header_text=cfg.HEADER_FOOTER_SEPARATOR.join(
-                        (
-                            self._story_text(kyrgyz_doc, cfg.HEADER_STORY),
-                            self._story_text(russian_doc, cfg.HEADER_STORY),
-                        )
-                    ),
-                    footer_text=cfg.HEADER_FOOTER_SEPARATOR.join(
-                        (
-                            self._story_text(kyrgyz_doc, cfg.FOOTER_STORY),
-                            self._story_text(russian_doc, cfg.FOOTER_STORY),
-                        )
-                    ),
-                )
+            self._set_headers_and_footers(
+                merged_doc,
+                header_text=cfg.HEADER_FOOTER_SEPARATOR.join(
+                    (
+                        self._story_text(kyrgyz_doc, cfg.HEADER_STORY),
+                        self._story_text(russian_doc, cfg.HEADER_STORY),
+                    )
+                ),
+                footer_text=cfg.HEADER_FOOTER_SEPARATOR.join(
+                    (
+                        self._story_text(kyrgyz_doc, cfg.FOOTER_STORY),
+                        self._story_text(russian_doc, cfg.FOOTER_STORY),
+                    )
+                ),
+            )
 
-                self._append_merged_body(kyrgyz_doc, russian_doc, merged_doc)
-                output_path.parent.mkdir(parents=True, exist_ok=True)
-                merged_doc.SaveAs2(str(output_path.resolve()), FileFormat=cfg.WORD_FORMAT_XML_DOCUMENT)
-                for doc in (merged_doc, kyrgyz_doc, russian_doc):
-                    doc.Close(SaveChanges=cfg.WORD_DO_NOT_SAVE_CHANGES)
-                merged_doc = kyrgyz_doc = russian_doc = None
+            self._append_merged_body(kyrgyz_doc, russian_doc, merged_doc)
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            merged_doc.SaveAs2(str(output_path.resolve()), FileFormat=cfg.WORD_FORMAT_XML_DOCUMENT)
+            for doc in (merged_doc, kyrgyz_doc, russian_doc):
+                doc.Close(SaveChanges=cfg.WORD_DO_NOT_SAVE_CHANGES)
+            merged_doc = kyrgyz_doc = russian_doc = None
         finally:
             for doc in (merged_doc, kyrgyz_doc, russian_doc):
                 if doc is not None:
                     doc.Close(SaveChanges=cfg.WORD_DO_NOT_SAVE_CHANGES)
-
-    def _prepare_source(self, path: Path, language: str, output_dir: Path) -> Path:
-        """Convert legacy .doc files to temporary .docx files; keep .docx sources untouched."""
-        if path.suffix.casefold() != cfg.LEGACY_DOC_EXTENSION:
-            return path
-
-        prepared_dir = output_dir / language
-        prepared_path = prepared_dir / f"{path.stem}{cfg.DOCX_EXTENSION}"
-
-        logging.info("Exporting legacy .doc with Word COM: %s", path)
-        self._export_doc_to_docx(path, prepared_path)
-        return prepared_path
-
-    def _export_doc_to_docx(self, source_path: Path, target_path: Path) -> None:
-        """Use Word COM SaveAs2 so old binary .doc files are converted by Word itself."""
-        target_path.parent.mkdir(parents=True, exist_ok=True)
-        doc = self._open_source(source_path)
-        try:
-            doc.SaveAs2(str(target_path.resolve()), FileFormat=cfg.WORD_FORMAT_XML_DOCUMENT)
-        finally:
-            doc.Close(SaveChanges=cfg.WORD_DO_NOT_SAVE_CHANGES)
 
     def _open_source(self, path: Path):
         return self.word.Documents.Open(

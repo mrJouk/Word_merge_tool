@@ -43,7 +43,7 @@ The output will be:
 - `merged_documents/test_merged.docx`
 - `merged_documents/legacy_merged.docx` if the legacy `.doc` dummy files exist
 
-When a source file is `.doc`, the Word backend first exports it through Microsoft Word COM into a temporary `.docx` working copy. Temporary working copies are deleted automatically after each merge.
+When a source file is `.doc`, the Word backend opens and parses it directly through Microsoft Word COM. It does not export source `.doc` files to `.docx` before merging; only the final merged document is saved as `.docx`.
 
 When both documents contain a table at the same table position, the app creates one merged table instead of two separate tables. Matching header cells are written as `Kyrgyz title / Russian title`.
 
@@ -55,7 +55,7 @@ Use this when you need to see exactly what Word exposes before merging:
 .\.venv\Scripts\python.exe inspect_parsing.py --pair legacy --output parsing_report.txt
 ```
 
-The report shows headers, footers, body paragraphs, Word list labels such as `I)` or `1)`, and table cells for both documents. For `.doc` inputs it also creates a temporary `.docx` export and reports that parse too, so you can check whether `.doc -> .docx` conversion changes Roman numerals.
+The report shows headers, footers, body paragraphs, Word list labels such as `I)` or `1)`, and table cells for both documents. For `.doc` inputs it also creates a temporary `.docx` export and reports that parse too, so you can check whether `.doc -> .docx` conversion changes Roman numerals. Use `--no-doc-conversion-check` to inspect only the original files without any export.
 
 ## Backends
 
