@@ -308,7 +308,44 @@ class WordAutomationMerger:
         target_range = cell.Range
         if target_range.End > target_range.Start:
             target_range.End = target_range.End - 1
+
+        if self._range_has_list_labels(source_range):
+            self._copy_range_to_cell_with_static_list_labels(source_range, target_range)
+            return
+
         target_range.FormattedText = source_range.FormattedText
+
+    def _range_has_list_labels(self, source_range) -> bool:
+        """Detect whether a source range contains Word automatic list labels."""
+        try:
+            for paragraph in source_range.Paragraphs:
+                if str(paragraph.Range.ListFormat.ListString or "").strip():
+                    return True
+        except Exception as exc:
+            logging.debug("Could not inspect source range list labels: %s", exc)
+        return False
+
+    def _copy_range_to_cell_with_static_list_labels(self, source_range, target_range) -> None:
+        """Freeze list labels in a temporary Word document before copying into output.
+
+        Word can renumber automatic lists when two documents are copied into the
+        same destination table. Converting only the temporary copy keeps labels
+        such as I) or II) visually stable without changing the source document.
+        """
+        temp_doc = self.word.Documents.Add()
+        try:
+            temp_range = temp_doc.Content
+            if temp_range.End > temp_range.Start:
+                temp_range.End = temp_range.End - 1
+            temp_range.FormattedText = source_range.FormattedText
+
+            content_range = temp_doc.Content
+            if content_range.End > content_range.Start:
+                content_range.End = content_range.End - 1
+            content_range.ListFormat.ConvertNumbersToText(cfg.WORD_NUMBER_ALL_NUMBERS)
+            target_range.FormattedText = content_range.FormattedText
+        finally:
+            temp_doc.Close(SaveChanges=cfg.WORD_DO_NOT_SAVE_CHANGES)
 
     def _append_combined_word_table(self, kyrgyz_table, russian_table, merged_doc) -> None:
         """Create one Word table from matching source tables using combined cell text."""

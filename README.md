@@ -71,6 +71,8 @@ The fallback backend supports `.docx` only and preserves direct document XML whe
 
 For documents with automatic numbering such as Roman numerals, use `--backend word`. The Word backend copies non-table content with Word COM formatted ranges and only manually rebuilds matching source tables.
 
+When copied content contains Word automatic list labels, the Word backend freezes those labels in a temporary in-memory copy before inserting them into the merged file. This keeps visible labels such as `I)` and `II)` from being recalculated as decimal numbers in the output.
+
 ## Configuration
 
 Operational defaults, supported extensions, Word COM numeric constants, output naming, and dummy sample text live in `config.py`.
